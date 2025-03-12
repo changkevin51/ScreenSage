@@ -221,37 +221,25 @@ async function generateReportHandler(event) {
 
     try {
         const lastReport = await chrome.storage.local.get('lastReport');
-        if (lastReport.lastReport && Date.now() - lastReport.lastReport < 120000) {
-            showError('Please wait 2 minutes before generating another report');
+        if (lastReport.lastReport && Date.now() - lastReport.lastReport < 60000) {
+            showError('Please wait 1 minute before generating another report');
             button.classList.remove('loading');
             return;
         }
 
         chrome.storage.local.get(null, async (data) => {
             try {
-                
-                const response = await fetch('https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent', {
+                // Use Hack Club AI API instead of Gemini
+                const response = await fetch('https://ai.hackclub.com/chat/completions', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'x-goog-api-key': 'AIzaSyCL_N3hmVIlEE5jRY7-stVzAgD4H2JVkG0'
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        contents: [{
-                            parts: [{
-                                text: `Analyze this browsing data: ${JSON.stringify(data)}. ${getPrompt()}`
-                            }]
-                        }],
-                        generationConfig: {
-                            temperature: 0.7,
-                            topK: 40,
-                            topP: 0.95,
-                            maxOutputTokens: 1024
-                        },
-                        safetySettings: [
+                        messages: [
                             {
-                                category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-                                threshold: "BLOCK_NONE"
+                                role: "user", 
+                                content: `Analyze this browsing data: ${JSON.stringify(data)}. ${getPrompt()}`
                             }
                         ]
                     })
@@ -265,13 +253,13 @@ async function generateReportHandler(event) {
 
                 const result = await response.json();
                 
-                if (!result.candidates?.[0]?.content?.parts?.[0]?.text) {
+                // Extract content from the Hack Club API response format
+                if (!result.choices?.[0]?.message?.content) {
                     console.error('Invalid response format:', result);
                     throw new Error('Invalid API response format');
                 }
 
-                const fullText = result.candidates[0].content.parts[0].text;
-                
+                const fullText = result.choices[0].message.content;
                 
                 const parts = fullText.split('---STRUCTURED_INSIGHTS---');
                 const reportText = parts[0].trim();
